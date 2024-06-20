@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package petstore.v1;
+option go_package = "github.com/chapar-rest/mock-server/api;petstorev1";
+
+service PetstoreService {
+  rpc GetPetByID(PetID) returns (Pet) {};
+  rpc UpdatePetWithForm(UpdatePetWithFormReq) returns (Empty) {};
+  rpc DeletePet(PetID) returns (Empty) {};
+  rpc UploadFile(UploadFileReq) returns (ApiResponse) {};
+  rpc AddPet(Pet) returns (Pet) {};
+  rpc UpdatePet(Pet) returns (Pet) {};
+  rpc FindPetsByStatus(StatusReq) returns (Pets) {};
+}
+
+message Empty {}
+
+message Category {
+  int64 id = 1;
+  string name = 2;
+}
+
+message Tag {
+  int64 id = 1;
+  string name = 2;
+}
+
+enum Status {
+  available = 0;
+  pending = 1;
+  sold = 2;
+}
+
+message PetID {
+  int64 pet_id = 1;
+}
+
+message Pet {
+  int64 id = 1;
+  Category category = 2;
+  string name = 3;
+  repeated string photo_urls = 4;
+  repeated Tag tags = 5;
+  string status = 6;
+}
+
+message UpdatePetWithFormReq {
+  int64 pet_id = 1;
+  string name = 2;
+  string status = 3;
+}
+
+message UploadFileReq {
+  int64 pet_id = 1;
+  string additional_metadata = 2;
+  string file = 3;
+}
+
+message PetBody {
+  int64 pet_id = 1;
+  string body = 2;
+}
+
+message StatusReq {
+  repeated string status = 1;
+}
+
+message Pets {
+  repeated Pet pets = 1;
+}
+
+message ApiResponse {
+  int32 code = 1;
+  string type = 2;
+  string message = 3;
+}
