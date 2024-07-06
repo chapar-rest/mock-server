@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 
 const (
 	PetstoreService_GetPetByID_FullMethodName        = "/petstore.v1.PetstoreService/GetPetByID"
+	PetstoreService_GetPets_FullMethodName           = "/petstore.v1.PetstoreService/GetPets"
 	PetstoreService_UpdatePetWithForm_FullMethodName = "/petstore.v1.PetstoreService/UpdatePetWithForm"
 	PetstoreService_DeletePet_FullMethodName         = "/petstore.v1.PetstoreService/DeletePet"
 	PetstoreService_UploadFile_FullMethodName        = "/petstore.v1.PetstoreService/UploadFile"
@@ -33,6 +34,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PetstoreServiceClient interface {
 	GetPetByID(ctx context.Context, in *PetID, opts ...grpc.CallOption) (*Pet, error)
+	GetPets(ctx context.Context, in *Empty, opts ...grpc.CallOption) (PetstoreService_GetPetsClient, error)
 	UpdatePetWithForm(ctx context.Context, in *UpdatePetWithFormReq, opts ...grpc.CallOption) (*Empty, error)
 	DeletePet(ctx context.Context, in *PetID, opts ...grpc.CallOption) (*Empty, error)
 	UploadFile(ctx context.Context, in *UploadFileReq, opts ...grpc.CallOption) (*ApiResponse, error)
@@ -56,6 +58,38 @@ func (c *petstoreServiceClient) GetPetByID(ctx context.Context, in *PetID, opts 
 		return nil, err
 	}
 	return out, nil
+}
+
+func (c *petstoreServiceClient) GetPets(ctx context.Context, in *Empty, opts ...grpc.CallOption) (PetstoreService_GetPetsClient, error) {
+	stream, err := c.cc.NewStream(ctx, &PetstoreService_ServiceDesc.Streams[0], PetstoreService_GetPets_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &petstoreServiceGetPetsClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type PetstoreService_GetPetsClient interface {
+	Recv() (*Pet, error)
+	grpc.ClientStream
+}
+
+type petstoreServiceGetPetsClient struct {
+	grpc.ClientStream
+}
+
+func (x *petstoreServiceGetPetsClient) Recv() (*Pet, error) {
+	m := new(Pet)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func (c *petstoreServiceClient) UpdatePetWithForm(ctx context.Context, in *UpdatePetWithFormReq, opts ...grpc.CallOption) (*Empty, error) {
@@ -117,6 +151,7 @@ func (c *petstoreServiceClient) FindPetsByStatus(ctx context.Context, in *Status
 // for forward compatibility
 type PetstoreServiceServer interface {
 	GetPetByID(context.Context, *PetID) (*Pet, error)
+	GetPets(*Empty, PetstoreService_GetPetsServer) error
 	UpdatePetWithForm(context.Context, *UpdatePetWithFormReq) (*Empty, error)
 	DeletePet(context.Context, *PetID) (*Empty, error)
 	UploadFile(context.Context, *UploadFileReq) (*ApiResponse, error)
@@ -132,6 +167,9 @@ type UnimplementedPetstoreServiceServer struct {
 
 func (UnimplementedPetstoreServiceServer) GetPetByID(context.Context, *PetID) (*Pet, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPetByID not implemented")
+}
+func (UnimplementedPetstoreServiceServer) GetPets(*Empty, PetstoreService_GetPetsServer) error {
+	return status.Errorf(codes.Unimplemented, "method GetPets not implemented")
 }
 func (UnimplementedPetstoreServiceServer) UpdatePetWithForm(context.Context, *UpdatePetWithFormReq) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdatePetWithForm not implemented")
@@ -180,6 +218,27 @@ func _PetstoreService_GetPetByID_Handler(srv interface{}, ctx context.Context, d
 		return srv.(PetstoreServiceServer).GetPetByID(ctx, req.(*PetID))
 	}
 	return interceptor(ctx, in, info, handler)
+}
+
+func _PetstoreService_GetPets_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(PetstoreServiceServer).GetPets(m, &petstoreServiceGetPetsServer{stream})
+}
+
+type PetstoreService_GetPetsServer interface {
+	Send(*Pet) error
+	grpc.ServerStream
+}
+
+type petstoreServiceGetPetsServer struct {
+	grpc.ServerStream
+}
+
+func (x *petstoreServiceGetPetsServer) Send(m *Pet) error {
+	return x.ServerStream.SendMsg(m)
 }
 
 func _PetstoreService_UpdatePetWithForm_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -326,6 +385,12 @@ var PetstoreService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _PetstoreService_FindPetsByStatus_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "GetPets",
+			Handler:       _PetstoreService_GetPets_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "petstore.proto",
 }

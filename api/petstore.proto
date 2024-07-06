@@ -5,6 +5,7 @@ option go_package = "github.com/chapar-rest/mock-server/api;petstorev1";
 
 service PetstoreService {
   rpc GetPetByID(PetID) returns (Pet) {};
+  rpc GetPets(Empty) returns (stream Pet) {};
   rpc UpdatePetWithForm(UpdatePetWithFormReq) returns (Empty) {};
   rpc DeletePet(PetID) returns (Empty) {};
   rpc UploadFile(UploadFileReq) returns (ApiResponse) {};

@@ -39,3 +39,16 @@ func (g *Grpc) GetPetByID(ctx context.Context, req *petstorev1.PetID) (*petstore
 		Name: "dog",
 	}, nil
 }
+
+func (g *Grpc) GetPets(_ *petstorev1.Empty, req petstorev1.PetstoreService_GetPetsServer) error {
+	for i := 0; i < 10; i++ {
+		if err := req.Send(&petstorev1.Pet{
+			Id:   int64(int32(i)),
+			Name: "dog",
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
