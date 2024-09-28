@@ -7,9 +7,6 @@ LDFLAGS=-ldflags "-X=main.version=$(VERSION)"
 GOCMD?=CGO_ENABLED=0 go
 GO_MAIN_SRC?=.
 
-REGISTRY?=ghcr.io/chapar-rest
-IMAGE=$(REGISTRY)/$(APP_NAME)
-
 
 ##@ General
 
@@ -51,4 +48,4 @@ build: ## Build service binary.
 
 .PHONY: push
 push: ## Push docker image to registry.
-	VERSION=$(VERSION) KO_DOCKER_REPO=$(IMAGE) ko publish --base-import-paths --tags $(VERSION) .
+	VERSION=$(VERSION) KO_DOCKER_REPO=mirzakhani/mock-server ko publish --base-import-paths --tags $(VERSION) .
