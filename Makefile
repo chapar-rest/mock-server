@@ -48,4 +48,4 @@ build: ## Build service binary.
 
 .PHONY: push
 push: ## Push docker image to registry.
-	VERSION=$(VERSION) KO_DOCKER_REPO=mirzakhani/mock-server ko publish --base-import-paths --tags $(VERSION) .
+	VERSION=$(VERSION) KO_DOCKER_REPO=mirzakhani ko publish --base-import-paths --tags $(VERSION) .
