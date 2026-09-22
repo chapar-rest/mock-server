@@ -1,0 +1,759 @@
+openapi: 3.0.3
+info:
+  version: 1.0.0
+  title: Chapar Mock Server REST API
+  description: >-
+    Mock API for exercising HTTP clients such as Chapar. It exposes an
+    in-memory todo resource and a set of utility endpoints (echo, status codes,
+    delays, auth schemes, uploads, redirects, cookies, streaming).
+
+
+    Todos are scoped to a session. Send the same `X-Session-Id` header on every
+    request to get an isolated list; requests without it share the `public`
+    session. Sessions start with a few sample todos and expire after a period
+    of inactivity.
+
+servers:
+  - url: https://mocks.chapar.rest/api/v1
+  - url: http://localhost:8080/api/v1
+
+tags:
+  - name: todos
+  - name: utility
+
+paths:
+  /todos:
+    get:
+      operationId: ListTodos
+      tags: [todos]
+      summary: List todos in the session
+      parameters:
+        - $ref: "#/components/parameters/SessionIdHeader"
+        - name: completed
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: priority
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/TodoPriority"
+        - name: q
+          in: query
+          required: false
+          description: Case-insensitive substring match on title and description.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          $ref: "#/components/responses/ListTodosResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: CreateTodo
+      tags: [todos]
+      summary: Create a todo
+      parameters:
+        - $ref: "#/components/parameters/SessionIdHeader"
+      requestBody:
+        $ref: "#/components/requestBodies/CreateTodoRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/TodoResponse"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /todos/reset:
+    post:
+      operationId: ResetTodos
+      tags: [todos]
+      summary: Reset the session to its sample todos
+      parameters:
+        - $ref: "#/components/parameters/SessionIdHeader"
+      responses:
+        "200":
+          $ref: "#/components/responses/ListTodosResponse"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /todos/{todo_id}:
+    parameters:
+      - $ref: "#/components/parameters/TodoId"
+      - $ref: "#/components/parameters/SessionIdHeader"
+    get:
+      operationId: GetTodo
+      tags: [todos]
+      summary: Get a todo
+      responses:
+        "200":
+          $ref: "#/components/responses/TodoResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      operationId: ReplaceTodo
+      tags: [todos]
+      summary: Replace a todo
+      requestBody:
+        $ref: "#/components/requestBodies/ReplaceTodoRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/TodoResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: UpdateTodo
+      tags: [todos]
+      summary: Partially update a todo; omitted fields are left unchanged
+      requestBody:
+        $ref: "#/components/requestBodies/UpdateTodoRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/TodoResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: DeleteTodo
+      tags: [todos]
+      summary: Delete a todo
+      responses:
+        "204":
+          description: Deleted
+        default:
+          $ref: "#/components/responses/Error"
+
+  /echo:
+    get:
+      operationId: EchoGet
+      tags: [utility]
+      summary: Echo the request back
+      responses:
+        "200":
+          $ref: "#/components/responses/EchoResponse"
+    post:
+      operationId: EchoPost
+      tags: [utility]
+      summary: Echo the request back
+      requestBody:
+        $ref: "#/components/requestBodies/AnyBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/EchoResponse"
+    put:
+      operationId: EchoPut
+      tags: [utility]
+      summary: Echo the request back
+      requestBody:
+        $ref: "#/components/requestBodies/AnyBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/EchoResponse"
+    patch:
+      operationId: EchoPatch
+      tags: [utility]
+      summary: Echo the request back
+      requestBody:
+        $ref: "#/components/requestBodies/AnyBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/EchoResponse"
+    delete:
+      operationId: EchoDelete
+      tags: [utility]
+      summary: Echo the request back
+      responses:
+        "200":
+          $ref: "#/components/responses/EchoResponse"
+
+  /status/{code}:
+    get:
+      operationId: GetStatus
+      tags: [utility]
+      summary: Respond with the given HTTP status code
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 200
+            maximum: 599
+      responses:
+        default:
+          $ref: "#/components/responses/StatusResponse"
+
+  /delay/{ms}:
+    get:
+      operationId: GetDelay
+      tags: [utility]
+      summary: Respond after the given number of milliseconds
+      parameters:
+        - name: ms
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 10000
+      responses:
+        "200":
+          $ref: "#/components/responses/EchoResponse"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /auth/basic/{username}/{password}:
+    get:
+      operationId: BasicAuth
+      tags: [utility]
+      summary: Succeeds when HTTP Basic credentials match the path
+      security:
+        - BasicAuth: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: password
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/AuthResponse"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /auth/bearer:
+    get:
+      operationId: BearerAuth
+      tags: [utility]
+      summary: Succeeds when any bearer token is sent
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/AuthResponse"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /auth/api-key:
+    get:
+      operationId: ApiKeyAuth
+      tags: [utility]
+      summary: Succeeds when any API key is sent in the X-API-Key header or api_key query parameter
+      security:
+        - ApiKeyHeader: []
+        - ApiKeyQuery: []
+      responses:
+        "200":
+          $ref: "#/components/responses/AuthResponse"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /cookies:
+    get:
+      operationId: GetCookies
+      tags: [utility]
+      summary: Return the cookies sent with the request
+      responses:
+        "200":
+          $ref: "#/components/responses/CookiesResponse"
+
+  /cookies/set:
+    get:
+      operationId: SetCookies
+      tags: [utility]
+      summary: Set a cookie for every query parameter, e.g. /cookies/set?theme=dark
+      responses:
+        "200":
+          $ref: "#/components/responses/CookiesResponse"
+
+  /redirect/{n}:
+    get:
+      operationId: Redirect
+      tags: [utility]
+      summary: Redirect n times with 302, ending at /echo
+      parameters:
+        - name: n
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+      responses:
+        "302":
+          description: Redirect to the next hop
+          headers:
+            Location:
+              schema:
+                type: string
+        default:
+          $ref: "#/components/responses/Error"
+
+  /upload:
+    post:
+      operationId: Upload
+      tags: [utility]
+      summary: Accept a multipart upload and describe the received parts
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          $ref: "#/components/responses/UploadResponse"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /form:
+    post:
+      operationId: SubmitForm
+      tags: [utility]
+      summary: Accept a URL-encoded form and return its fields
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/FormResponse"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /stream/{n}:
+    get:
+      operationId: Stream
+      tags: [utility]
+      summary: Stream n newline-delimited JSON objects, one every 100ms
+      parameters:
+        - name: n
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: A chunked stream of JSON lines
+          content:
+            application/x-ndjson:
+              schema:
+                $ref: "#/components/schemas/StreamEvent"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /bytes/{n}:
+    get:
+      operationId: GetBytes
+      tags: [utility]
+      summary: Return n random bytes
+      parameters:
+        - name: n
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 102400
+      responses:
+        "200":
+          description: Random bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: "#/components/responses/Error"
+
+  /formats/{format}:
+    get:
+      operationId: GetFormat
+      tags: [utility]
+      summary: Return a sample document in the given format
+      parameters:
+        - name: format
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [json, xml, html, text, csv]
+      responses:
+        "200":
+          description: Sample document
+          content:
+            application/json:
+              schema:
+                type: object
+            application/xml:
+              schema:
+                type: string
+            text/html:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+            text/csv:
+              schema:
+                type: string
+        default:
+          $ref: "#/components/responses/Error"
+
+components:
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: basic
+    BearerAuth:
+      type: http
+      scheme: bearer
+    ApiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    ApiKeyQuery:
+      type: apiKey
+      in: query
+      name: api_key
+
+  parameters:
+    SessionIdHeader:
+      name: X-Session-Id
+      in: header
+      required: false
+      description: Isolates todos per client. Defaults to the shared `public` session.
+      schema:
+        type: string
+        maxLength: 64
+    TodoId:
+      name: todo_id
+      in: path
+      required: true
+      schema:
+        type: string
+
+  schemas:
+    TodoPriority:
+      type: string
+      enum: [low, medium, high]
+
+    Todo:
+      type: object
+      required: [id, title, description, completed, priority, tags, due_at, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        completed:
+          type: boolean
+        priority:
+          $ref: "#/components/schemas/TodoPriority"
+        tags:
+          type: array
+          items:
+            type: string
+        due_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TodoInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+        completed:
+          type: boolean
+          default: false
+        priority:
+          $ref: "#/components/schemas/TodoPriority"
+        tags:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 32
+        due_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    TodoPatch:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+        completed:
+          type: boolean
+        priority:
+          $ref: "#/components/schemas/TodoPriority"
+        tags:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 32
+        due_at:
+          type: string
+          format: date-time
+
+    Echo:
+      type: object
+      required: [method, url, path, protocol, host, remote_ip, query, headers, body]
+      properties:
+        method:
+          type: string
+        url:
+          type: string
+        path:
+          type: string
+        protocol:
+          type: string
+        host:
+          type: string
+        remote_ip:
+          type: string
+        query:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        body:
+          type: string
+          description: Raw request body; truncated to 64 KiB.
+        json:
+          description: The request body parsed as JSON, when it is valid JSON.
+
+    StreamEvent:
+      type: object
+      required: [index, time]
+      properties:
+        index:
+          type: integer
+        time:
+          type: string
+          format: date-time
+
+    UploadedFile:
+      type: object
+      required: [field, filename, content_type, size, sha256]
+      properties:
+        field:
+          type: string
+        filename:
+          type: string
+        content_type:
+          type: string
+        size:
+          type: integer
+          format: int64
+        sha256:
+          type: string
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+  requestBodies:
+    CreateTodoRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TodoInput"
+    ReplaceTodoRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TodoInput"
+    UpdateTodoRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TodoPatch"
+    AnyBody:
+      required: false
+      content:
+        "*/*":
+          schema: {}
+
+  responses:
+    ListTodosResponse:
+      description: A page of todos
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data, total, limit, offset]
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Todo"
+              total:
+                type: integer
+              limit:
+                type: integer
+              offset:
+                type: integer
+
+    TodoResponse:
+      description: A todo
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                $ref: "#/components/schemas/Todo"
+
+    EchoResponse:
+      description: The request as the server received it
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Echo"
+
+    StatusResponse:
+      description: The requested status code
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [code, description]
+            properties:
+              code:
+                type: integer
+              description:
+                type: string
+
+    AuthResponse:
+      description: Authenticated
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [authenticated, scheme, credential]
+            properties:
+              authenticated:
+                type: boolean
+              scheme:
+                type: string
+              credential:
+                type: string
+                description: The username, token or API key that was accepted.
+
+    CookiesResponse:
+      description: Cookies
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [cookies]
+            properties:
+              cookies:
+                type: object
+                additionalProperties:
+                  type: string
+
+    UploadResponse:
+      description: Received parts
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [files, fields]
+            properties:
+              files:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UploadedFile"
+              fields:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+
+    FormResponse:
+      description: Received fields
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [fields]
+            properties:
+              fields:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"

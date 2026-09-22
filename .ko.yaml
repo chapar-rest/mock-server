@@ -1,5 +1,9 @@
-defaultBaseImage: gcr.io/distroless/static:nonroot
+defaultBaseImage: alpine:latest
+
+defaultPlatforms:
+- linux/amd64
 
 builds:
   - id: server
-    main: .
+    main: ./cmd/server
+    ldflags: ["-X main.serviceVersion={{ .Env.VERSION }}"]

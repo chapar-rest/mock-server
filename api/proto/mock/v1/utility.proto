@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package mock.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/chapar-rest/mock-server/internal/gen/mockv1;mockv1";
+
+// UtilityService exercises gRPC client features: metadata, status codes,
+// deadlines and every streaming mode.
+service UtilityService {
+  // Echo returns the message and the request metadata. It also sends a
+  // `method` header and a `timestamp` trailer.
+  rpc Echo(EchoRequest) returns (EchoResponse);
+  // Status fails with the requested gRPC status code (0 succeeds).
+  rpc Status(StatusRequest) returns (google.protobuf.Empty);
+  // Delay responds after the requested number of milliseconds (max 10000).
+  rpc Delay(DelayRequest) returns (EchoResponse);
+  // ServerStream sends `count` messages, `interval_ms` apart.
+  rpc ServerStream(StreamRequest) returns (stream EchoResponse);
+  // ClientStream collects every message and replies once the client closes.
+  rpc ClientStream(stream EchoRequest) returns (ClientStreamResponse);
+  // BidiStream echoes every message as it arrives.
+  rpc BidiStream(stream EchoRequest) returns (stream EchoResponse);
+  // Auth succeeds when `authorization` (Basic or Bearer) or `x-api-key`
+  // metadata is present, and fails with UNAUTHENTICATED otherwise.
+  rpc Auth(google.protobuf.Empty) returns (AuthResponse);
+}
+
+message EchoRequest {
+  string message = 1;
+}
+
+message MetadataValues {
+  repeated string values = 1;
+}
+
+message EchoResponse {
+  string message = 1;
+  map<string, MetadataValues> metadata = 2;
+  // Position of the message within a stream, starting at 0.
+  int32 index = 3;
+  google.protobuf.Timestamp time = 4;
+}
+
+message StatusRequest {
+  // A google.rpc.Code value, 0-16.
+  int32 code = 1;
+  string message = 2;
+}
+
+message DelayRequest {
+  int32 ms = 1;
+  string message = 2;
+}
+
+message StreamRequest {
+  string message = 1;
+  // 1-100.
+  int32 count = 2;
+  // 0-5000.
+  int32 interval_ms = 3;
+}
+
+message ClientStreamResponse {
+  int32 count = 1;
+  repeated string messages = 2;
+}
+
+message AuthResponse {
+  bool authenticated = 1;
+  string scheme = 2;
+  // The username, token or API key that was accepted.
+  string credential = 3;
+}

@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mock-server-ingress
+  namespace: mock-server
+  annotations:
+    # <namespace>-<name>@kubernetescrd; see k8s/middleware.yaml.
+    traefik.ingress.kubernetes.io/router.middlewares: mock-server-inflight@kubernetescrd,mock-server-ratelimit@kubernetescrd
+spec:
+  rules:
+    # REST lives under /api/v1; gRPC paths are /mock.v1.<Service>/<Method>
+    # and /grpc.reflection.*, so the whole host routes to the pod.
+    - host: mocks.chapar.rest
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mock-server
+                port:
+                  number: 8080

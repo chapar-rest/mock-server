@@ -1,0 +1,9 @@
+# Compiled binaries.
+/server
+
+# Claude Code personal settings (machine-specific hooks, permissions).
+.claude/settings.local.json
+
+.env.local
+
+CLAUDE.local.md

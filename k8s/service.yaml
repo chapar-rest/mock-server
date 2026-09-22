@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-server
+  namespace: mock-server
+  annotations:
+    # Traefik talks cleartext HTTP/2 to the pod, which gRPC requires. The
+    # server accepts HTTP/1.1 and h2c on the same port, so REST keeps working.
+    traefik.ingress.kubernetes.io/service.serversscheme: h2c
+spec:
+  selector:
+    app: mock-server
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP

@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-server
+  namespace: mock-server
+spec:
+  # All state is in memory, so a second replica would see different data.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mock-server
+  template:
+    metadata:
+      labels:
+        app: mock-server
+    spec:
+      containers:
+        - name: mock-server
+          # Updated on every deploy by `task deploy:k8s`.
+          image: ghcr.io/chapar-rest/mock-server:latest
+          ports:
+            # Serves REST (HTTP/1.1 and h2c) and gRPC (h2c) on one port.
+            - containerPort: 8080
+              name: http
+          env:
+            - name: MOCK_ENV
+              value: "prod"
+            - name: MOCK_LOG_LEVEL
+              value: "info"
+            - name: PORT
+              value: "8080"
+            - name: MOCK_SESSION_TTL
+              value: "1h"
+            - name: MOCK_CLEANUP_INTERVAL
+              value: "1m"
+            - name: MOCK_MAX_SESSIONS
+              value: "1000"
+            - name: MOCK_MAX_TODOS_PER_SESSION
+              value: "100"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 512Mi

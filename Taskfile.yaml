@@ -1,0 +1,67 @@
+version: "3"
+
+vars:
+  IMAGE: "ghcr.io/chapar-rest/mock-server"
+  NAMESPACE: "mock-server"
+
+tasks:
+  # Default task: test + lint.
+  default:
+    cmds:
+      - task: test
+      - task: lint
+
+  # Run Go tests.
+  test:
+    cmds:
+      - go test ./...
+
+  # Lint Go code.
+  lint:
+    cmds:
+      - golangci-lint run
+
+  # go mod tidy + go mod vendor
+  tidy:
+    cmds:
+      - go mod tidy
+      - go mod vendor
+
+  # Re-generate all generated artifacts.
+  generate:
+    cmds:
+      - rm -rf ./internal/gen
+      - mkdir ./internal/gen
+      - go generate ./...
+
+  # Start the server for local development. REST: http://localhost:8080/api/v1,
+  # gRPC: grpcurl -plaintext localhost:8080 list
+  dev:
+    env:
+      MOCK_ENV: "local"
+      MOCK_LOG_LEVEL: "debug"
+      PORT: "8080"
+    cmds:
+      - go run ./cmd/server
+
+  # The source label links the GHCR package to the public repo, so the
+  # package is public too and the cluster pulls it without a secret.
+  build:images:
+    vars:
+      SHORT_HASH:
+       sh: git rev-parse --short HEAD
+    cmds:
+      - VERSION="v1.0.0-{{.SHORT_HASH}}" KO_DOCKER_REPO="{{.IMAGE}}" ko build --bare --tags "v1.0.0-{{.SHORT_HASH}}" --image-label org.opencontainers.image.source=https://github.com/chapar-rest/mock-server ./cmd/server
+
+  deploy:k8s:
+    vars:
+      SHORT_HASH:
+       sh: git rev-parse --short HEAD
+    cmds:
+      - kubectl -n {{.NAMESPACE}} set image deployment/mock-server mock-server={{.IMAGE}}:v1.0.0-{{.SHORT_HASH}}
+
+  # Build and push the image, then roll out the server.
+  publish:
+    cmds:
+      - task: build:images
+      - task: deploy:k8s

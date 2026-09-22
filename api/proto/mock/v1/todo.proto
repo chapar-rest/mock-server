@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package mock.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/chapar-rest/mock-server/internal/gen/mockv1;mockv1";
+
+// TodoService is an in-memory todo list. Todos are scoped to a session: send
+// the same `x-session-id` metadata on every call to get an isolated list.
+// Calls without it share the `public` session. Sessions start with a few
+// sample todos and expire after a period of inactivity.
+service TodoService {
+  rpc ListTodos(ListTodosRequest) returns (ListTodosResponse);
+  rpc GetTodo(GetTodoRequest) returns (Todo);
+  rpc CreateTodo(CreateTodoRequest) returns (Todo);
+  // UpdateTodo updates the fields named in update_mask. An empty mask
+  // replaces every field.
+  rpc UpdateTodo(UpdateTodoRequest) returns (Todo);
+  rpc DeleteTodo(DeleteTodoRequest) returns (google.protobuf.Empty);
+  // ResetTodos restores the session to its sample todos.
+  rpc ResetTodos(google.protobuf.Empty) returns (ListTodosResponse);
+}
+
+enum TodoPriority {
+  TODO_PRIORITY_UNSPECIFIED = 0;
+  TODO_PRIORITY_LOW = 1;
+  TODO_PRIORITY_MEDIUM = 2;
+  TODO_PRIORITY_HIGH = 3;
+}
+
+message Todo {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  bool completed = 4;
+  TodoPriority priority = 5;
+  repeated string tags = 6;
+  google.protobuf.Timestamp due_at = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message ListTodosRequest {
+  optional bool completed = 1;
+  // Unspecified means any priority.
+  TodoPriority priority = 2;
+  // Case-insensitive substring match on title and description.
+  string query = 3;
+  // 1-100, defaults to 20.
+  int32 limit = 4;
+  int32 offset = 5;
+}
+
+message ListTodosResponse {
+  repeated Todo todos = 1;
+  int32 total = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message GetTodoRequest {
+  string id = 1;
+}
+
+message CreateTodoRequest {
+  string title = 1;
+  string description = 2;
+  bool completed = 3;
+  // Unspecified defaults to medium.
+  TodoPriority priority = 4;
+  repeated string tags = 5;
+  google.protobuf.Timestamp due_at = 6;
+}
+
+message UpdateTodoRequest {
+  // todo.id selects the todo to update.
+  Todo todo = 1;
+  // Paths use field names: title, description, completed, priority, tags, due_at.
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message DeleteTodoRequest {
+  string id = 1;
+}

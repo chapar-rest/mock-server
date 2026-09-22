@@ -1,0 +1,39 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - exhaustruct
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+  settings:
+    exhaustruct:
+      exclude:
+        # Generated protobuf messages are built with only the fields a
+        # response needs; unset fields are part of the wire contract.
+        - github.com/chapar-rest/mock-server/internal/gen/mockv1\..*
+        - google.golang.org/protobuf/types/known/.*
+
+formatters:
+  enable:
+    - goimports
+    - gci
+
+  settings:
+    goimports:
+      local-prefixes:
+       - github.com/chapar-rest/mock-server
+    gci:
+      sections:
+        - standard
+        - default
+        - "prefix(github.com/chapar-rest/mock-server)"
+        - localmodule
+
+run:
+  modules-download-mode: vendor
+  timeout: 5m

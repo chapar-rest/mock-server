@@ -1,0 +1,160 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+  pull-requests: read
+
+jobs:
+  gate:
+    name: should deploy?
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.decide.outputs.deploy }}
+      reason: ${{ steps.decide.outputs.reason }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Decide
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          out() {
+            echo "deploy=$1" >> "$GITHUB_OUTPUT"
+            echo "reason=$2" >> "$GITHUB_OUTPUT"
+            echo "Deploy decision: $1 ($2)"
+          }
+
+          # Manual runs always deploy.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            out true "workflow_dispatch"
+            exit 0
+          fi
+
+          MSG="$(git log -1 --pretty=%B)"
+          if printf '%s\n' "$MSG" | grep -qiE '\[skip[[:space:]-]?deploy\]'; then
+            out false "commit message [skip deploy]"
+            exit 0
+          fi
+
+          # Squash/merge commits are linked back to their PR(s); honor skip-deploy there.
+          # Accept header required for the commit→pulls association API.
+          PRS="$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" \
+            -H "Accept: application/vnd.github.groot-preview+json" \
+            --jq '.[].number' 2>/dev/null || true)"
+          for pr in $PRS; do
+            if gh pr view "$pr" --repo "${{ github.repository }}" --json labels \
+              --jq '.labels[].name' | grep -qx 'skip-deploy'; then
+              out false "PR #${pr} labeled skip-deploy"
+              exit 0
+            fi
+          done
+
+          BEFORE="${{ github.event.before }}"
+          if [ -n "$BEFORE" ] && [[ "$BEFORE" =~ ^0+$ ]]; then
+            CHANGED="$(git show --pretty='' --name-only HEAD)"
+          elif [ -n "$BEFORE" ]; then
+            CHANGED="$(git diff --name-only "$BEFORE" "${{ github.sha }}")"
+          else
+            CHANGED="$(git diff --name-only HEAD~1 HEAD)"
+          fi
+
+          if [ -z "$(printf '%s' "$CHANGED" | tr -d '[:space:]')" ]; then
+            out true "no file list; defaulting to deploy"
+            exit 0
+          fi
+
+          deploy_relevant=false
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              # Docs, agent/CI workflows, and repo meta never need a k8s rollout.
+              *.md|docs/*|.github/*|.gitignore|LICENSE*|CODEOWNERS)
+                ;;
+              *)
+                deploy_relevant=true
+                break
+                ;;
+            esac
+          done <<< "$CHANGED"
+
+          if [ "$deploy_relevant" = false ]; then
+            out false "only non-deploy paths changed"
+            exit 0
+          fi
+
+          out true "default"
+
+  skipped:
+    name: skipped
+    needs: gate
+    if: needs.gate.outputs.deploy != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain skip
+        run: echo "Skipping deploy — ${{ needs.gate.outputs.reason }}"
+
+  publish:
+    name: publish + deploy
+    needs: gate
+    if: needs.gate.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Install ko
+        uses: ko-build/setup-ko@v0.7
+
+      - name: Write kubeconfig
+        env:
+          KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG }}
+        run: |
+          mkdir -p "$HOME/.kube"
+          printf '%s\n' "$KUBECONFIG_CONTENT" > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+          echo "KUBECONFIG=$HOME/.kube/config" >> "$GITHUB_ENV"
+          kubectl config current-context
+          kubectl -n mock-server get deploy
+
+      - name: Login to GHCR
+        env:
+          PAT: ${{ secrets.PAT }}
+        run: |
+          echo "$PAT" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Publish (image + rollout)
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }}
+        run: task publish

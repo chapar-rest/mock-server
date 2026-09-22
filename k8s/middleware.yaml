@@ -1,0 +1,31 @@
+# Per-client limits, applied by Traefik before requests reach the pod. The
+# client is identified by CF-Connecting-IP: traffic arrives through the
+# Cloudflare proxy, and the Traefik service (externalTrafficPolicy: Cluster)
+# does not preserve source IPs, so the remote address is useless as a key.
+# Requests without the header (not via Cloudflare) all share one bucket.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: ratelimit
+  namespace: mock-server
+spec:
+  rateLimit:
+    # Sustained 10 req/s per client, bursts up to 30. Excess gets 429.
+    average: 10
+    period: 1s
+    burst: 30
+    sourceCriterion:
+      requestHeaderName: CF-Connecting-IP
+---
+# Caps concurrent requests per client, which the rate limit alone does not:
+# /delay, /stream and gRPC streams hold a request open for seconds or longer.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: inflight
+  namespace: mock-server
+spec:
+  inFlightReq:
+    amount: 10
+    sourceCriterion:
+      requestHeaderName: CF-Connecting-IP
