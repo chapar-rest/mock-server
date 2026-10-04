@@ -48,9 +48,7 @@ func (c *Controller) Stream(w http.ResponseWriter, r *http.Request) {
 	}
 	defer s.done()
 
-	// Nothing is read, but control frames (pongs, the client's close) still
-	// need a reader; CloseRead runs one and ends ctx when the client leaves.
-	ctx := s.conn.CloseRead(s.ctx)
+	ctx := s.discardReads()
 	err = c.service.Stream(ctx, count, interval, func(index int, at time.Time) error {
 		return s.writeJSON(&streamEvent{Index: index, Count: count, Time: at})
 	})

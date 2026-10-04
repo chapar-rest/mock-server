@@ -43,7 +43,7 @@ func (c *Controller) Todos(w http.ResponseWriter, r *http.Request) {
 	events, cancel := c.service.SubscribeTodos(sessionId)
 	defer cancel()
 
-	ctx := s.conn.CloseRead(s.ctx)
+	ctx := s.discardReads()
 	//nolint:exhaustruct // the greeting carries no todo.
 	if err := s.writeJSON(&todoMessage{Type: todosSubscribed, Session: sessionId.String(), Time: time.Now().UTC()}); err != nil {
 		return

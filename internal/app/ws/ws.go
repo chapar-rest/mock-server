@@ -198,6 +198,25 @@ func (c *Controller) keepAlive(ctx context.Context, conn *websocket.Conn) {
 	}
 }
 
+// discardReads reads and drops what the client sends, for endpoints that
+// only write. Control frames (pongs, the client's close) need a reader too.
+// The returned context ends when the client goes away.
+//
+// websocket.Conn.CloseRead would also do, but it closes the connection with
+// 1008 on the first data message; these endpoints ignore messages instead.
+func (s *session) discardReads() context.Context {
+	ctx, cancel := context.WithCancel(s.ctx)
+	go func() {
+		defer cancel()
+		for {
+			if _, _, err := s.conn.Read(ctx); err != nil {
+				return
+			}
+		}
+	}()
+	return ctx
+}
+
 // writeJSON sends v as one text message.
 func (s *session) writeJSON(v any) error {
 	data, err := json.Marshal(v)
