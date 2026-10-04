@@ -21,7 +21,7 @@ type ReplaceTodoRequest struct {
 
 // ReplaceTodo overwrites every user-editable field of a todo.
 func (s *Service) ReplaceTodo(_ context.Context, req *ReplaceTodoRequest) (*model.Todo, error) {
-	return s.store.UpdateTodo(req.SessionId, req.Id, func(t *model.Todo) error {
+	updated, err := s.store.UpdateTodo(req.SessionId, req.Id, func(t *model.Todo) error {
 		t.Title = req.Title
 		t.Description = req.Description
 		t.Completed = req.Completed
@@ -31,4 +31,9 @@ func (s *Service) ReplaceTodo(_ context.Context, req *ReplaceTodoRequest) (*mode
 		t.UpdatedAt = s.now()
 		return validateTodo(t)
 	})
+	if err != nil {
+		return nil, err
+	}
+	s.publishTodoEvent(req.SessionId, model.TodoEventUpdated, updated.Id, updated)
+	return updated, nil
 }

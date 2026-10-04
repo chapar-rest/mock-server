@@ -24,6 +24,12 @@ Point `mocks.chapar.rest` at the cluster. For gRPC through a TLS-terminating
 proxy in front of Traefik (e.g. Cloudflare), the proxy must allow gRPC /
 HTTP/2 to the origin.
 
+#### WebSocket
+`/ws` routes to the `mock-server-ws` Service, which talks HTTP/1.1 to the
+pod: Traefik cannot upgrade a WebSocket over the h2c Service gRPC needs.
+Cloudflare must have WebSockets enabled (the default) and closes idle
+connections after about 100 seconds; the server pings every 30.
+
 #### Rate limiting
 `k8s/middleware.yaml` limits each client (by `CF-Connecting-IP`) to 10 req/s
 (burst 30) and 10 concurrent requests. The key relies on traffic coming

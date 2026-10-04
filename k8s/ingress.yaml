@@ -13,6 +13,14 @@ spec:
     - host: mocks.chapar.rest
       http:
         paths:
+          # WebSockets go to the HTTP/1.1 Service; see k8s/service.yaml.
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: mock-server-ws
+                port:
+                  number: 8080
           - path: /
             pathType: Prefix
             backend:

@@ -78,14 +78,18 @@ func main() {
 	// from grpcurl -plaintext in local development.
 	protocols.SetUnencryptedHTTP2(true)
 
+	controller := app.NewController(logger, service, grpcapi.NewServer(logger.Named("grpc"), service))
+
 	//nolint:exhaustruct // every other field keeps the net/http default.
 	server := &http.Server{
 		Addr:              net.JoinHostPort("0.0.0.0", cfg.Port),
-		Handler:           app.NewController(logger, service, grpcapi.NewServer(logger.Named("grpc"), service)),
+		Handler:           controller,
 		Protocols:         &protocols,
 		ReadHeaderTimeout: readHeaderTimeout,
 		IdleTimeout:       idleTimeout,
 	}
+	// Upgraded WebSockets are invisible to Shutdown; tell them to go away.
+	server.RegisterOnShutdown(controller.Shutdown)
 
 	workerService := worker.NewWorker(logger.Named("worker"), cfg.CleanupInterval)
 	if err := workerService.AddAgent("session-cleanup", worker.NewSessionCleanupAgent(logger.Named("session-cleanup"), store, cfg.SessionTTL)); err != nil {

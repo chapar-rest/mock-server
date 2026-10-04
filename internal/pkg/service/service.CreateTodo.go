@@ -35,7 +35,12 @@ func (s *Service) CreateTodo(_ context.Context, req *CreateTodoRequest) (*model.
 		return nil, err
 	}
 
-	return s.store.CreateTodo(req.SessionId, todo)
+	created, err := s.store.CreateTodo(req.SessionId, todo)
+	if err != nil {
+		return nil, err
+	}
+	s.publishTodoEvent(req.SessionId, model.TodoEventCreated, created.Id, created)
+	return created, nil
 }
 
 func defaultPriority(p model.TodoPriority) model.TodoPriority {

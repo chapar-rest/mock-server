@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Public mock API (`mocks.chapar.rest`) for exercising API clients like Chapar. A single Go process serves REST and gRPC on one port; GraphQL, WebSocket and MQTT are planned and must reuse the same service layer.
+Public mock API (`mocks.chapar.rest`) for exercising API clients like Chapar. A single Go process serves REST, gRPC and WebSocket on one port; GraphQL and MQTT are planned and must reuse the same service layer.
 
 ## Commands
 
@@ -31,14 +31,17 @@ Single test: `go test ./internal/app -run TestGrpcOnSamePort -v`.
 - Directives are in `generate.go` (repo root). Never hand-edit `internal/gen/`. The generated code is committed.
 - The two contracts are maintained by hand and must stay equivalent: when adding an operation, add it to both specs.
 
-### One port, two protocols
-`internal/app/http.go` `Controller.ServeHTTP` routes HTTP/2 requests with `Content-Type: application/grpc` to `grpc.Server.ServeHTTP`. Everything else goes to the chi router: `/api/v1/*` → REST, plus `/healthz` and `/readyz`. `cmd/server/main.go` enables cleartext HTTP/2 (h2c) through `http.Server.Protocols`. In k8s, Traefik reaches the pod over h2c because of the `serversscheme: h2c` annotation in `k8s/service.yaml`. gRPC requests skip the chi middleware (CORS, body limit, logging); `internal/app/grpc/api/api.go` has its own interceptors.
+### One port, three protocols
+`internal/app/http.go` `Controller.ServeHTTP` routes HTTP/2 requests with `Content-Type: application/grpc` to `grpc.Server.ServeHTTP`. Everything else goes to the chi router: `/api/v1/*` → REST, `/ws/*` → WebSocket (`internal/app/ws`, github.com/coder/websocket), plus `/healthz` and `/readyz`. `cmd/server/main.go` enables cleartext HTTP/2 (h2c) through `http.Server.Protocols`. In k8s, Traefik reaches the pod over h2c because of the `serversscheme: h2c` annotation in `k8s/service.yaml`. gRPC requests skip the chi middleware (CORS, body limit, logging); `internal/app/grpc/api/api.go` has its own interceptors.
+
+WebSocket upgrades need HTTP/1.1 between Traefik and the pod, which the h2c service cannot give, so `k8s/service.yaml` has a second Service, `mock-server-ws`, without the h2c annotation, and the ingress sends `/ws` to it. `http.Server.Shutdown` does not see upgraded connections; `main.go` registers `Controller.Shutdown` with `RegisterOnShutdown` to close them with 1001. `internal/app/ws` validates query parameters before the upgrade so bad input is a JSON 400, caps open sockets per client (`CF-Connecting-IP`), and ends every connection after 10 minutes. `/ws/todos` subscribes through `service.SubscribeTodos`; the service publishes after each successful create, update, replace, delete and reset.
 
 ### Layers
 ```
 cmd/server/main.go        → env config (envconfig), zap, store, service, HTTP server, worker goroutine, graceful shutdown on SIGTERM
 internal/app/rest/api/    → api.<Operation>.go per endpoint; implements restapi.ServerInterface
 internal/app/grpc/api/    → api.<Method>.go per RPC; TodoServer / UtilityServer (two types because both Unimplemented*Server embeds define colliding methods)
+internal/app/ws/          → ws.<Endpoint>.go per WebSocket endpoint; ws.go has accept (limits, keep-alive, lifetime) and Shutdown
 internal/pkg/service/     → service.<Operation>.go; shared business logic and validation for every transport
 internal/pkg/memstore/    → memstore.<Operation>.go; session-scoped in-memory store
 internal/pkg/model/       → typed ids/enums (TodoId, SessionId, TodoPriority) with Parse* constructors

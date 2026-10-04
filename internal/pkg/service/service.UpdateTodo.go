@@ -22,7 +22,7 @@ type UpdateTodoRequest struct {
 }
 
 func (s *Service) UpdateTodo(_ context.Context, req *UpdateTodoRequest) (*model.Todo, error) {
-	return s.store.UpdateTodo(req.SessionId, req.Id, func(t *model.Todo) error {
+	updated, err := s.store.UpdateTodo(req.SessionId, req.Id, func(t *model.Todo) error {
 		if v, ok := req.Title.Get(); ok {
 			t.Title = v
 		}
@@ -44,4 +44,9 @@ func (s *Service) UpdateTodo(_ context.Context, req *UpdateTodoRequest) (*model.
 		t.UpdatedAt = s.now()
 		return validateTodo(t)
 	})
+	if err != nil {
+		return nil, err
+	}
+	s.publishTodoEvent(req.SessionId, model.TodoEventUpdated, updated.Id, updated)
+	return updated, nil
 }
