@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 
 	restapi "github.com/chapar-rest/mock-server/internal/app/rest/api"
+	"github.com/chapar-rest/mock-server/internal/app/ws"
 	"github.com/chapar-rest/mock-server/internal/pkg/service"
 	"github.com/chapar-rest/mock-server/internal/pkg/utils/restutils"
 )
@@ -23,6 +24,7 @@ type Controller struct {
 	logger *zap.Logger
 
 	restApi    http.Handler
+	wsApi      *ws.Controller
 	grpcServer *grpc.Server
 
 	router *chi.Mux
@@ -33,6 +35,7 @@ type Controller struct {
 // REST routes:
 //
 //	/api/v1/*  → REST API (internal/app/rest/api)
+//	/ws/*      → WebSocket API (internal/app/ws)
 //	/healthz   → liveness probe
 //	/readyz    → readiness probe
 //
@@ -64,6 +67,7 @@ func NewController(logger *zap.Logger, service *service.Service, grpcServer *grp
 	c := &Controller{
 		logger:     logger,
 		restApi:    restapi.NewController(logger.Named("rest"), service),
+		wsApi:      ws.NewController(logger.Named("ws"), service),
 		grpcServer: grpcServer,
 		router:     router,
 	}
@@ -72,6 +76,7 @@ func NewController(logger *zap.Logger, service *service.Service, grpcServer *grp
 	c.router.Get("/readyz", probe)
 
 	c.router.Mount("/api/v1", c.restApi)
+	c.router.Mount("/ws", c.wsApi)
 
 	c.router.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 		restutils.JSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
@@ -90,6 +95,12 @@ func (c *Controller) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.router.ServeHTTP(w, r)
+}
+
+// Shutdown closes the connections http.Server.Shutdown cannot see: upgraded
+// WebSockets. Register it with http.Server.RegisterOnShutdown.
+func (c *Controller) Shutdown() {
+	c.wsApi.Shutdown()
 }
 
 // probe answers both liveness and readiness. All state is in memory, so a

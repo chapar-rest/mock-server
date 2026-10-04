@@ -7,5 +7,9 @@ import (
 )
 
 func (s *Service) DeleteTodo(_ context.Context, sessionId model.SessionId, id model.TodoId) error {
-	return s.store.DeleteTodo(sessionId, id)
+	if err := s.store.DeleteTodo(sessionId, id); err != nil {
+		return err
+	}
+	s.publishTodoEvent(sessionId, model.TodoEventDeleted, id, nil)
+	return nil
 }

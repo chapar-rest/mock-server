@@ -11,6 +11,7 @@ func (s *Service) ResetTodos(ctx context.Context, sessionId model.SessionId) (*L
 	if err := s.store.ResetSession(sessionId); err != nil {
 		return nil, err
 	}
+	s.publishTodoEvent(sessionId, model.TodoEventReset, "", nil)
 
 	//nolint:exhaustruct // an unfiltered first page is the zero-valued filter.
 	return s.ListTodos(ctx, &ListTodosRequest{SessionId: sessionId})

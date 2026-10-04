@@ -16,6 +16,8 @@ type Service struct {
 	logger *zap.Logger
 	store  *memstore.Store
 	now    func() time.Time
+
+	todoEvents *todoHub
 }
 
 // NewService creates a new service.
@@ -24,5 +26,7 @@ func NewService(logger *zap.Logger, store *memstore.Store) *Service {
 		logger: logger,
 		store:  store,
 		now:    utils.Now,
+
+		todoEvents: newTodoHub(),
 	}
 }
