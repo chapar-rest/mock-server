@@ -85,7 +85,11 @@ func TestWebSocketStream(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, _ := dialWS(t, ctx, wsURL(srv.URL, "/ws/stream?count=3&interval_ms=0"), nil)
+	conn, _ := dialWS(t, ctx, wsURL(srv.URL, "/ws/stream?count=3&interval_ms=50"), nil)
+	// Messages from the client are ignored, not a reason to close.
+	if err := conn.Write(ctx, websocket.MessageText, []byte("hello")); err != nil {
+		t.Fatalf("write: %v", err)
+	}
 	for i := range 3 {
 		var ev struct {
 			Index int `json:"index"`
